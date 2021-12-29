@@ -25,7 +25,6 @@ timeout:
     params:
       script: |
         ls -la
-
 functions:
   "fetch source":
     # Executes git clone and applies the submitted patch, if any
@@ -37,19 +36,15 @@ functions:
         working_dir: "src"
         script: |
           set -ex
-
           git submodule update --init --recursive
-
   "fetch egos":
     - command: shell.exec
       params:
         working_dir: "src"
         script: |
           set -ex
-
           curl -sfLo egos https://raw.githubusercontent.com/p-mongo/egos/master/egos
           chmod +x ./egos
-
   "create expansions":
     # Make an evergreen exapanstion file with dynamic values
     - command: shell.exec
@@ -62,14 +57,11 @@ functions:
            else
               CURRENT_VERSION=latest
            fi
-
            export DRIVERS_TOOLS="$(pwd)/../drivers-tools"
-
            export MONGO_ORCHESTRATION_HOME="$DRIVERS_TOOLS/.evergreen/orchestration"
            export MONGODB_BINARIES="$DRIVERS_TOOLS/mongodb/bin"
            export UPLOAD_BUCKET="${project}"
            export PROJECT_DIRECTORY="$(pwd)"
-
            cat <<EOT > expansion.yml
            CURRENT_VERSION: "$CURRENT_VERSION"
            DRIVERS_TOOLS: "$DRIVERS_TOOLS"
@@ -85,11 +77,9 @@ functions:
               export MONGODB_BINARIES="$MONGODB_BINARIES"
               export UPLOAD_BUCKET="$UPLOAD_BUCKET"
               export PROJECT_DIRECTORY="$PROJECT_DIRECTORY"
-
               export TMPDIR="$MONGO_ORCHESTRATION_HOME/db"
               export PATH="$MONGODB_BINARIES:$PATH"
               export PROJECT="${project}"
-
               export MONGODB_VERSION=${VERSION}
               export TOPOLOGY=${TOPOLOGY}
               export SINGLE_MONGOS=${SINGLE_MONGOS}
@@ -99,7 +89,6 @@ functions:
            EOT
            # See what we've done
            cat expansion.yml
-
     # Load the expansion file to make an evergreen variable with the current unique version
     - command: expansions.update
       params:
@@ -113,7 +102,6 @@ functions:
         script: |
           ${PREPARE_SHELL}
           [ -f ${PROJECT_DIRECTORY}/${file} ] && sh ${PROJECT_DIRECTORY}/${file} || echo "${PROJECT_DIRECTORY}/${file} not available, skipping"
-
   "upload docs" :
     - command: shell.exec
       params:
@@ -284,7 +272,6 @@ functions:
             I18N="${I18N}" \
             TEST_I18N_FALLBACKS="${TEST_I18N_FALLBACKS}" \
             ./egos .evergreen/run-tests.sh
-
   "fix absolute paths":
     - command: shell.exec
       params:
@@ -293,7 +280,6 @@ functions:
           for filename in $(find ${DRIVERS_TOOLS} -name \*.json); do
             perl -p -i -e "s|ABSOLUTE_PATH_REPLACEMENT_TOKEN|${DRIVERS_TOOLS}|g" $filename
           done
-
   "install dependencies":
     - command: shell.exec
       type: test
@@ -303,7 +289,6 @@ functions:
           ${PREPARE_SHELL}
           file="${PROJECT_DIRECTORY}/.evergreen/install-dependencies.sh"
           [ -f ${file} ] && sh ${file} || echo "${file} not available, skipping"
-
 pre:
   - func: "fetch source"
   - func: "fetch egos"
@@ -420,6 +405,10 @@ axes:
         display_name: ruby-3.0
         variables:
           RVM_RUBY: "ruby-3.0"
+      - id: "ruby-3.1"
+        display_name: ruby-3.1
+        variables:
+          RVM_RUBY: "ruby-3.1"
       - id: "ruby-head"
         display_name: ruby-head
         variables:
@@ -440,7 +429,6 @@ axes:
       - id: ubuntu-18.04
         display_name: "Ubuntu 18.04"
         run_on: ubuntu1804-small
-
       - id: rhel70
         display_name: "RHEL 7.0"
         run_on: rhel70-small
@@ -506,6 +494,10 @@ axes:
         display_name: "Rails 6.1"
         variables:
           RAILS: "6.1"
+      - id: "7.0"
+        display_name: "Rails 7.0"
+        variables:
+          RAILS: "7.0"
   - id: "i18n"
     display_name: I18n version
     values:
@@ -531,6 +523,18 @@ axes:
           APP_TESTS: yes
 
 buildvariants:
+- matrix_name: "ruby-3.1"
+  matrix_spec:
+    ruby: ["ruby-3.1"]
+    driver: ["current"]
+    topology: '*'
+    mongodb-version: ['5.0']
+  display_name: "${ruby}, ${driver}, ${rails}, ${mongodb-version}, ${topology}"
+  run_on:
+    - ubuntu1804-small
+  tasks:
+    - name: "test"
+
 - matrix_name: "ruby-3.0"
   matrix_spec:
     ruby: ["ruby-3.0"]
@@ -594,7 +598,7 @@ buildvariants:
 - matrix_name: "driver-upcoming"
   matrix_spec:
     driver: [master, stable]
-    ruby: ["ruby-3.0"]
+    ruby: ["ruby-3.1", "ruby-3.0"]
     mongodb-version: "5.0"
     topology: ['replica-set', 'sharded-cluster']
   display_name: "${ruby}, ${driver}, ${mongodb-version}, ${topology}"
@@ -627,9 +631,22 @@ buildvariants:
   tasks:
      - name: "test"
 
+- matrix_name: "rails-7"
+  matrix_spec:
+    ruby: ["ruby-3.1", "ruby-3.0"]
+    driver: ["current"]
+    mongodb-version: "5.0"
+    topology: "standalone"
+    rails: ['7.0']
+  display_name: "${rails}, ${driver}, ${mongodb-version}"
+  run_on:
+    - rhel70-small
+  tasks:
+    - name: "test"
+
 - matrix_name: "rails-6"
   matrix_spec:
-    ruby: ["ruby-3.0"]
+    ruby: ["ruby-3.1", "ruby-3.0"]
     driver: ["current"]
     mongodb-version: "5.0"
     topology: "standalone"
@@ -679,6 +696,20 @@ buildvariants:
     - rhel70-small
   tasks:
      - name: "test"
+
+- matrix_name: app-tests-ruby-3.1
+  matrix_spec:
+    ruby: ruby-3.1
+    driver: ["current"]
+    mongodb-version: '5.0'
+    topology: standalone
+    app-tests: yes
+    rails: ['6.1', '7.0']
+  display_name: "app tests ${driver}, ${ruby}, ${rails}"
+  run_on:
+    - ubuntu1804-small
+  tasks:
+    - name: "test"
 
 - matrix_name: app-tests-ruby-3.0
   matrix_spec:
